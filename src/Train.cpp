@@ -7,8 +7,9 @@ using namespace Backgammon;
 
 int main() {
 
-    int start = 0;
-    int end = 300'000;
+    int start = 300'000;
+    int end = 2'000'000;
+    int checkpoint = 200'000;
     
     // Weight filenames
     std::string start_filename = "weights/" + std::to_string(start) + "_games.csv";
@@ -34,7 +35,7 @@ int main() {
         std::cout << "Game nr. " << i << std::endl;
         game.play();
 
-        if (i % 50'000 == 0) {
+        if (i % checkpoint == 0) {
             std::string checkpoint = "weights/" + std::to_string(i) + "_games.csv";
             model->save(checkpoint);
             std::cout << "Saved weights in file: " << checkpoint << std::endl;

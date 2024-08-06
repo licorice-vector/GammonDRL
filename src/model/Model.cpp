@@ -3,7 +3,7 @@
 
 namespace Backgammon {
     NeuralNetwork::NeuralNetwork() {
-        l1 = RevGrad::Linear(this, 198, 40);
+        l1 = RevGrad::Linear(this, 200, 40);
         l2 = RevGrad::Linear(this, 40, 1);
     }
 
@@ -21,7 +21,7 @@ namespace Backgammon {
         for (auto param : nn.get_params()) {
             size += param.size();
         }
-        errors = std::vector<float>(size);
+        momentum = std::vector<float>(size);
     }
 
     void Model::save(std::string filename) { nn.save_parameters(filename); }
@@ -29,9 +29,11 @@ namespace Backgammon {
 
     RevGrad::Tensor Model::tensor_from_state(const State& state) {
         std::vector<float> values;
-        values.reserve(198);
+        values.reserve(200);
         for (int player = 0; player <= 1; player++) {
+            int pip_cnt = 0;
             for (int point = 0; point < BOARD_SIZE; point++) {
+                pip_cnt += state.on[player][point] * abs(point - (player == WHITE ? -1 : 24));
                 int n = state.on[player][point];
                 if (n == 0) {
                     values.push_back(0.0f);
@@ -59,6 +61,7 @@ namespace Backgammon {
                 values.push_back(1.0f);
                 values.push_back((n - 3.0f) / 2.0f);
             }
+            values.push_back(pip_cnt / 540.0f);
         }
         for (int player = 0; player <= 1; player++) {
             int n = state.on[player][BAR];
@@ -75,7 +78,7 @@ namespace Backgammon {
             values.push_back(0.0f);
             values.push_back(1.0f);
         }
-        return RevGrad::Tensor(RevGrad::Shape({198, 1}), values);
+        return RevGrad::Tensor(RevGrad::Shape({200, 1}), values);
     }
 
     int Model::choose_move(const State& state, const Dice& dice, const Moves& moves) {
@@ -106,7 +109,7 @@ namespace Backgammon {
         for (auto param : nn.get_params()) {
             size += param.size();
         }
-        errors = std::vector<float>(size);
+        momentum = std::vector<float>(size);
     }
 
     RevGrad::Tensor Model::predict(const State& state) {
@@ -121,18 +124,26 @@ namespace Backgammon {
         int reward = 0;
         if (next.on[WHITE][REMOVED] == 15 || next.on[BLACK][REMOVED] == 15) {
             Outcome outcome = next.outcome(WHITE);
-            reward = (
-                outcome == Outcome::WON_SINGLE_GAME || 
-                outcome == Outcome::WON_GAMMON || 
-                outcome == Outcome::WON_BACKGAMMON
-            ) ? 1 : -1;
+            if (outcome == Outcome::WON_SINGLE_GAME) {
+                reward = 1;
+            } else if (outcome == Outcome::WON_GAMMON) {
+                reward = 2;
+            } else if (outcome == Outcome::WON_BACKGAMMON) {
+                reward = 3;
+            } else if (outcome == Outcome::LOST_SINGLE_GAME) {
+                reward = -1;
+            } else if (outcome == Outcome::LOST_GAMMON) {
+                reward = -2;
+            } else if (outcome == Outcome::LOST_BACKGAMMON) {
+                reward = -3;
+            }
             std::cout << "Prediction: " << next_prediction.value({0}) << std::endl;
             std::cout << "Reward: " << reward << std::endl;
         }
         float gamma = 0.7;
         float learning_rate = 0.1;
         RevGrad::Tensor prediction = predict(state);
-        float delta = reward + gamma * (next_prediction.value({0}) - prediction.value({0}));
+        float error = reward + gamma * (next_prediction.value({0}) - prediction.value({0}));
         // Zero the gradients
         for (auto param : nn.get_params()) {
             for (auto& grad : param.grads()) {
@@ -145,8 +156,8 @@ namespace Backgammon {
         int j = 0;
         for (auto param : nn.get_params()) {
             for (int i = 0; i < param.size(); i++) {
-                errors[j] = gamma * errors[j] + param.grads()[i];
-                param.values()[i] += learning_rate * delta * errors[j];
+                momentum[j] = gamma * momentum[j] + param.grads()[i];
+                param.values()[i] += learning_rate * error * momentum[j];
                 j++;
             }
         }

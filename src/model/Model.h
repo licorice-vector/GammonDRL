@@ -16,7 +16,7 @@ namespace Backgammon {
     class Model {
     public:
         NeuralNetwork nn;
-        std::vector<float> errors;
+        std::vector<float> momentum;
         Model();
         void save(std::string filename);
         void load(std::string filename);
