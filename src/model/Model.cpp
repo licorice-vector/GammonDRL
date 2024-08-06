@@ -1,4 +1,5 @@
 #include "Model.h"
+#include "../RevGrad/utill/Print.h"
 
 namespace Backgammon {
     NeuralNetwork::NeuralNetwork() {
@@ -113,23 +114,23 @@ namespace Backgammon {
     }
 
     void Model::update(const State& state, const Move& move) {
-        int reward = 0;
-        if (state.on[WHITE][REMOVED] == 15 || state.on[BLACK][REMOVED] == 15) {
-            Outcome outcome = state.outcome(WHITE);
-            if (
-                outcome == Outcome::WON_SINGLE_GAME || 
-                outcome == Outcome::WON_GAMMON || 
-                outcome == Outcome::WON_BACKGAMMON
-            ) {
-                reward = 1;
-            }
-        }
-        float gamma = 0.7;
-        float learning_rate = 0.1;
         State next = state;
         next.make_move(move);
         next.turn = !next.turn;
         RevGrad::Tensor next_prediction = predict(next);
+        int reward = 0;
+        if (next.on[WHITE][REMOVED] == 15 || next.on[BLACK][REMOVED] == 15) {
+            Outcome outcome = next.outcome(WHITE);
+            reward = (
+                outcome == Outcome::WON_SINGLE_GAME || 
+                outcome == Outcome::WON_GAMMON || 
+                outcome == Outcome::WON_BACKGAMMON
+            ) ? 1 : -1;
+            std::cout << "Prediction: " << next_prediction.value({0}) << std::endl;
+            std::cout << "Reward: " << reward << std::endl;
+        }
+        float gamma = 0.7;
+        float learning_rate = 0.1;
         RevGrad::Tensor prediction = predict(state);
         float delta = reward + gamma * (next_prediction.value({0}) - prediction.value({0}));
         // Zero the gradients

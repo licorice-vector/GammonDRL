@@ -7,7 +7,7 @@ using namespace Backgammon;
 
 int main() {
 
-    std::vector<int> start = {300'000, 300'000};
+    std::vector<int> start = {300'000, 50'000};
     
     // Weight filenames
     std::vector<std::string> start_filename = {
