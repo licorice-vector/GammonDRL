@@ -78,8 +78,8 @@ namespace Backgammon {
                         c = tolower(c);
                     }
                 }
-                if (!number && s != "bar" && s != "removed") {
-                    std::cout << s << " is not a number, BAR or REMOVED" << std::endl;
+                if (!number && s != "bar" && s != "out") {
+                    std::cout << s << " is not a number, BAR or OUT" << std::endl;
                     continue;
                 }
                 int from;
@@ -88,7 +88,7 @@ namespace Backgammon {
                 } else if (s == "bar") {
                     from = BAR + 1;
                 } else {
-                    from = REMOVED + 1;
+                    from = OUT + 1;
                 }
                 std::cout << "[to] > ";
                 std::cin >> s;
@@ -101,8 +101,8 @@ namespace Backgammon {
                         c = tolower(c);
                     }
                 }
-                if (!number && s != "bar" && s != "removed") {
-                    std::cout << s << " is not a number, BAR or REMOVED" << std::endl;
+                if (!number && s != "bar" && s != "out") {
+                    std::cout << s << " is not a number, BAR or OUT" << std::endl;
                     continue;
                 }
                 int to;
@@ -111,7 +111,7 @@ namespace Backgammon {
                 } else if (s == "bar") {
                     to = BAR + 1;
                 } else {
-                    to = REMOVED + 1;
+                    to = OUT + 1;
                 }
                 from--, to--;
                 move.insert(CheckerMove(from, to));

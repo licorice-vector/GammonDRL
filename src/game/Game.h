@@ -17,7 +17,7 @@ namespace Backgammon {
     #define WHITE 0
     #define BLACK 1
     #define BAR 24
-    #define REMOVED 25
+    #define OUT 25
     #define BOARD_SIZE 24
 
     enum Outcome { 
@@ -90,6 +90,7 @@ namespace Backgammon {
 
     class Game {
     public:
+        std::array<int, 2> points;
         State state;
         Dice dice;
         std::array<std::shared_ptr<Player>, 2> players;

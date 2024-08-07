@@ -39,14 +39,14 @@ namespace Backgammon {
         for (auto point : home[turn]) {
             cnt += on[turn][point];
         }
-        return cnt + on[turn][REMOVED] == 15;
+        return cnt + on[turn][OUT] == 15;
     }
     
     void State::make_move(Move move) {
         Undo undo;
         for (auto checker_move : move) {
             auto [from, to] = checker_move;
-            if (to != REMOVED && on[!turn][to]) {
+            if (to != OUT && on[!turn][to]) {
                 on[!turn][BAR]++;
                 on[!turn][to]--;
                 undo.push_back({!turn, CheckerMove(to, BAR)});
@@ -81,7 +81,7 @@ namespace Backgammon {
         if (can_bear_off()) {
             int bear_off_point = (turn == WHITE ? -1 : 24) + -1 * direction * delta;
             if (on[turn][bear_off_point]) {
-                move.insert(CheckerMove(bear_off_point, REMOVED));
+                move.insert(CheckerMove(bear_off_point, OUT));
             }
         }
         for (int from = 0; from < BOARD_SIZE; from++) {
@@ -142,7 +142,7 @@ namespace Backgammon {
             Move to_be_erased;
             for (auto point : home[turn]) {
                 while (on[turn][point] && index < (int)deltas.size()) {
-                    CheckerMove checker_move(point, REMOVED);
+                    CheckerMove checker_move(point, OUT);
                     move.insert(checker_move);
                     to_be_erased.insert(checker_move);
                     make_move({checker_move});
@@ -180,8 +180,8 @@ namespace Backgammon {
     }
 
     Outcome State::outcome(int player) const {
-        if (on[player][REMOVED] == 15) {
-            if (on[!player][REMOVED]) {
+        if (on[player][OUT] == 15) {
+            if (on[!player][OUT]) {
                 return Outcome::WON_SINGLE_GAME;
             }
             if (on[!player][BAR]) {
@@ -194,7 +194,7 @@ namespace Backgammon {
             }
             return Outcome::WON_GAMMON;
         }
-        if (on[player][REMOVED]) {
+        if (on[player][OUT]) {
             return Outcome::LOST_SINGLE_GAME;
         }
         if (on[player][BAR]) {
@@ -233,7 +233,7 @@ namespace Backgammon {
                     std::cout << "  " + std::string(on[WHITE][BAR] > 14 - row ? white : " ") + "  |";
                 }
             }
-            std::cout << "  " << (on[BLACK][REMOVED] > row ? black : " ") << "  |" << std::endl;
+            std::cout << "  " << (on[BLACK][OUT] > row ? black : " ") << "  |" << std::endl;
         }
         std::cout << "|-----------------------------------|-BAR-|-----------------------------------|-----|" << std::endl;
         for (int row = 14; row >= 0; row--) {
@@ -244,7 +244,7 @@ namespace Backgammon {
                     std::cout << "  " + std::string(on[BLACK][BAR] > 14 - row ? black : " ") + "  |";
                 }
             }
-            std::cout << "  " << (on[WHITE][REMOVED] > row ? white : " ") << "  |" << std::endl;
+            std::cout << "  " << (on[WHITE][OUT] > row ? white : " ") << "  |" << std::endl;
         }
         std::cout << "|-----------------------------------|-----|-----------------------------------|-----|" << std::endl;
         std::cout << "| 012 | 011 | 010 | 009 | 008 | 007 |     | 006 | 005 | 004 | 003 | 002 | 001 | OUT |" << std::endl;
@@ -281,14 +281,15 @@ namespace Backgammon {
     std::mt19937 Dice::rng = std::mt19937(rd());
 
     Game::Game(std::shared_ptr<Player> white, std::shared_ptr<Player> black) {
+        points.fill(0);
         players[WHITE] = white;
         players[BLACK] = black;
     }
 
     void Game::play_turn() {
         dice.roll();
-        state.show();
-        std::cout << "Dice: " << dice.first << " " << dice.second << std::endl;
+        //state.show();
+        //std::cout << "Dice: " << dice.first << " " << dice.second << std::endl;
         Moves moves = state.get_moves(dice.get_deltas());
         if (moves.empty()) {
             players[state.turn]->no_moves(state);
@@ -296,10 +297,10 @@ namespace Backgammon {
             return;
         }
         int index = players[state.turn]->choose_move(state, dice, moves);
-        std::cout << "Moved the following checkers (from, to):" << std::endl;
-        for (auto [from, to] : moves[index]) {
-            std::cout << "(" << from + 1 << ", " << to + 1 << ")" << std::endl;
-        }
+        //std::cout << "Moved the following checkers (from, to):" << std::endl;
+        //for (auto [from, to] : moves[index]) {
+        //    std::cout << "(" << from + 1 << ", " << to + 1 << ")" << std::endl;
+        //}
         state.make_move(moves[index]);
         state.turn = !state.turn;
     }
@@ -316,26 +317,32 @@ namespace Backgammon {
         state.turn = dice.first < dice.second ? WHITE : BLACK;
         while (true) {
             play_turn();
-            if (state.on[!state.turn][REMOVED] == 15) {
+            if (state.on[!state.turn][OUT] == 15) {
                 players[WHITE]->game_over(state, WHITE);
                 players[BLACK]->game_over(state, BLACK);
-                state.show();
+                //state.show();
                 Outcome outcome = state.outcome(WHITE);
                 std::string s;
                 if (outcome == Outcome::WON_SINGLE_GAME) {
                     s = " won a single game";
+                    points[WHITE] += 1;
                 } else if (outcome == Outcome::WON_GAMMON) {
                     s = " won a gammon";
+                    points[WHITE] += 2;
                 } else if (outcome == Outcome::WON_BACKGAMMON) {
                     s = " won a backgammon";
+                    points[WHITE] += 3;
                 } else if (outcome == Outcome::LOST_SINGLE_GAME) {
                     s = " lost a single game";
+                    points[BLACK] += 1;
                 } else if (outcome == Outcome::LOST_GAMMON) {
                     s = " lost a gammon";
+                    points[BLACK] += 2;
                 } else if (outcome == Outcome::LOST_BACKGAMMON) {
                     s = " lost a backgammon";
+                    points[BLACK] += 3;
                 }
-                std::cout << "White " << s << std::endl;
+                //std::cout << "White " << s << std::endl;
                 break;
             }
         }

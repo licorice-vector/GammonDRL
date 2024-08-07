@@ -10,6 +10,7 @@ int main() {
     int start = 300'000;
     int end = 2'000'000;
     int checkpoint = 200'000;
+    int print_frequency = 1'000;
     
     // Weight filenames
     std::string start_filename = "weights/" + std::to_string(start) + "_games.csv";
@@ -32,7 +33,9 @@ int main() {
 
     // Play games
     for (int i = start + 1; i <= end; i++) {
-        std::cout << "Game nr. " << i << std::endl;
+        if (i % print_frequency == 0) {
+            std::cout << "Game nr. " << i << std::endl;
+        }
         game.play();
 
         if (i % checkpoint == 0) {

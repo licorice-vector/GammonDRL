@@ -1,5 +1,4 @@
 #include "Model.h"
-#include "../RevGrad/utill/Print.h"
 
 namespace Backgammon {
     NeuralNetwork::NeuralNetwork() {
@@ -68,7 +67,7 @@ namespace Backgammon {
             values.push_back(n / 2.0f);
         }
         for (int player = 0; player <= 1; player++) {
-            int n = state.on[player][REMOVED];
+            int n = state.on[player][OUT];
             values.push_back(n / 15.0f);
         }
         if (state.turn == WHITE) {
@@ -122,7 +121,7 @@ namespace Backgammon {
         next.turn = !next.turn;
         RevGrad::Tensor next_prediction = predict(next);
         int reward = 0;
-        if (next.on[WHITE][REMOVED] == 15 || next.on[BLACK][REMOVED] == 15) {
+        if (next.on[WHITE][OUT] == 15 || next.on[BLACK][OUT] == 15) {
             Outcome outcome = next.outcome(WHITE);
             if (outcome == Outcome::WON_SINGLE_GAME) {
                 reward = 1;
@@ -137,8 +136,6 @@ namespace Backgammon {
             } else if (outcome == Outcome::LOST_BACKGAMMON) {
                 reward = -3;
             }
-            std::cout << "Prediction: " << next_prediction.value({0}) << std::endl;
-            std::cout << "Reward: " << reward << std::endl;
         }
         float gamma = 0.7;
         float learning_rate = 0.1;
