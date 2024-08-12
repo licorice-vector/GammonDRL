@@ -1,9 +1,9 @@
 #include "Model.h"
 
 namespace Backgammon {
-    NeuralNetwork::NeuralNetwork() {
-        l1 = RevGrad::Linear(this, 200, 40);
-        l2 = RevGrad::Linear(this, 40, 1);
+    NeuralNetwork::NeuralNetwork(int hidden_units) {
+        l1 = RevGrad::Linear(this, 200, hidden_units);
+        l2 = RevGrad::Linear(this, hidden_units, 1);
     }
 
     RevGrad::Tensor NeuralNetwork::forward(RevGrad::Tensor x) {
@@ -15,13 +15,7 @@ namespace Backgammon {
         return y;
     }
 
-    Model::Model() : nn(NeuralNetwork()) {
-        int size = 0;
-        for (auto param : nn.get_params()) {
-            size += param.size();
-        }
-        momentum = std::vector<float>(size);
-    }
+    Model::Model(int hidden_units) : nn(NeuralNetwork(hidden_units)) {}
 
     void Model::save(std::string filename) { nn.save_parameters(filename); }
     void Model::load(std::string filename) { nn.load_parameters(filename); }
@@ -82,34 +76,28 @@ namespace Backgammon {
 
     int Model::choose_move(const State& state, const Dice& dice, const Moves& moves) {
         int index = 0;
-        float best_prediction = state.turn == WHITE ? 
+        float best_probability = state.turn == WHITE ? 
             std::numeric_limits<float>::lowest() : 
             std::numeric_limits<float>::max();
         State s = state;
         for (int i = 0; i < (int)moves.size(); i++) {
             s.make_move(moves[i]);
             s.turn = !s.turn;
-            float prediction = predict(s).value({0});
-            if (
-                (state.turn == WHITE && best_prediction < prediction) ||
-                (state.turn == BLACK && best_prediction > prediction)
-            ) {
-                best_prediction = prediction;
-                index = i;
-            }
+            float probability = predict(s).values()[0];
             s.undo_move();
             s.turn = !s.turn;
+            if (
+                (s.turn == WHITE && best_probability < probability) ||
+                (s.turn == BLACK && best_probability > probability)
+            ) {
+                best_probability = probability;
+                index = i;
+            }
         }
         return index;
     }
 
-    void Model::new_game() {
-        int size = 0;
-        for (auto param : nn.get_params()) {
-            size += param.size();
-        }
-        momentum = std::vector<float>(size);
-    }
+    void Model::new_game() {}
 
     RevGrad::Tensor Model::predict(const State& state) {
         return nn.forward(tensor_from_state(state));
@@ -120,27 +108,23 @@ namespace Backgammon {
         next.make_move(move);
         next.turn = !next.turn;
         RevGrad::Tensor next_prediction = predict(next);
-        int reward = 0;
+        RevGrad::Tensor prediction = predict(state);
+        float error;
         if (next.on[WHITE][OUT] == 15 || next.on[BLACK][OUT] == 15) {
             Outcome outcome = next.outcome(WHITE);
-            if (outcome == Outcome::WON_SINGLE_GAME) {
-                reward = 1;
-            } else if (outcome == Outcome::WON_GAMMON) {
-                reward = 2;
-            } else if (outcome == Outcome::WON_BACKGAMMON) {
-                reward = 3;
-            } else if (outcome == Outcome::LOST_SINGLE_GAME) {
-                reward = -1;
-            } else if (outcome == Outcome::LOST_GAMMON) {
-                reward = -2;
-            } else if (outcome == Outcome::LOST_BACKGAMMON) {
-                reward = -3;
+            if (
+                outcome == Outcome::WON_SINGLE_GAME ||
+                outcome == Outcome::WON_GAMMON ||
+                outcome == Outcome::WON_BACKGAMMON
+            ) {
+                error = 1 - prediction.values()[0];
+            } else {
+                error = 0 - prediction.values()[0];
             }
+        } else {
+            error = next_prediction.values()[0] - prediction.values()[0];
         }
-        float gamma = 0.7;
-        float learning_rate = 0.1;
-        RevGrad::Tensor prediction = predict(state);
-        float error = reward + gamma * (next_prediction.value({0}) - prediction.value({0}));
+        float alpha = 0.1f;
         // Zero the gradients
         for (auto param : nn.get_params()) {
             for (auto& grad : param.grads()) {
@@ -150,12 +134,9 @@ namespace Backgammon {
         // Compute the gradients
         prediction.backward();
         // Update the values
-        int j = 0;
         for (auto param : nn.get_params()) {
             for (int i = 0; i < param.size(); i++) {
-                momentum[j] = gamma * momentum[j] + param.grads()[i];
-                param.values()[i] += learning_rate * error * momentum[j];
-                j++;
+                param.values()[i] += alpha * error * param.grads()[i];
             }
         }
     }

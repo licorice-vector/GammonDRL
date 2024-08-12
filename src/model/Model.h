@@ -5,19 +5,20 @@
 #include "../player/Player.h"
 
 namespace Backgammon {
+    typedef std::vector<std::pair<float, Move>> ScoreMoves;
+
     class NeuralNetwork : public RevGrad::Model {
     public:
         RevGrad::Linear l1;
         RevGrad::Linear l2;
-        NeuralNetwork();
+        NeuralNetwork(int hidden_units);
         RevGrad::Tensor forward(RevGrad::Tensor x);
     };
 
     class Model {
     public:
         NeuralNetwork nn;
-        std::vector<float> momentum;
-        Model();
+        Model(int hidden_units);
         void save(std::string filename);
         void load(std::string filename);
         RevGrad::Tensor tensor_from_state(const State& state);
