@@ -114,7 +114,8 @@ namespace Backgammon {
                     to = OUT + 1;
                 }
                 from--, to--;
-                move.insert(CheckerMove(from, to));
+                move.push_back(CheckerMove(from, to));
+                std::sort(move.begin(), move.end());
             } else if (action == 1) {
                 for (int i = 0; i < (int)moves.size(); i++) {
                     if (moves[i] == move) {

@@ -34,12 +34,32 @@ namespace Backgammon {
         on[WHITE][23] = 2;
     }
 
-    bool State::can_bear_off() {
-        int cnt = 0;
-        for (auto point : home[turn]) {
-            cnt += on[turn][point];
+    int State::compute_pip(int player) const {
+        int pip = 25 * on[player][BAR];
+        for (int point = 0; point < BOARD_SIZE; point++) {
+            pip += on[player][point] * abs(point - (player == WHITE ? -1 : 24));
         }
-        return cnt + on[turn][OUT] == 15;
+        return pip;
+    }
+
+    bool State::race() const {
+        if (on[WHITE][BAR] || on[BLACK][BAR]) {
+            return false;
+        }
+        int sum = on[WHITE][OUT];
+        if (sum == 15) {
+            return true;
+        }
+        for (int point = 0; point < BOARD_SIZE; point++) {
+            if (on[BLACK][point]) {
+                return false;
+            }
+            sum += on[WHITE][point];
+            if (sum == 15) {
+                return true;
+            }
+        }
+        assert(false);
     }
     
     void State::make_move(Move move) {
@@ -68,115 +88,102 @@ namespace Backgammon {
         }
     }
 
-    Move State::get_move(int delta) {
-        int direction = turn == WHITE ? -1 : 1;
-        Move move;
-        if (on[turn][BAR]) {
-            int to = (turn == WHITE ? 24 : -1) + direction * delta;
-            if (on[!turn][to] <= 1) {
-                move.insert(CheckerMove(BAR, to));
-            }
-            return move;
-        }
-        if (can_bear_off()) {
-            int bear_off_point = (turn == WHITE ? -1 : 24) + -1 * direction * delta;
-            if (on[turn][bear_off_point]) {
-                move.insert(CheckerMove(bear_off_point, OUT));
-            }
-        }
-        for (int from = 0; from < BOARD_SIZE; from++) {
-            int to = from + direction * delta;
-            if (on[turn][from] && 0 <= to && to < BOARD_SIZE && on[!turn][to] <= 1) {
-                move.insert(CheckerMove(from, to));
-            }
-        }
-        return move;
-    }
-
-    bool State::no_moves(const Deltas& deltas, int index) {
-        while (index < (int)deltas.size()) {
-            if (get_move(deltas[index]).size()) {
-                return false;
-            }
-            index++;
-        }
-        return true;
-    }
-
     Moves State::get_moves(Deltas deltas) {
-        std::set<Move> seen;
-        Move move;
         Moves moves;
-        get_moves(deltas, 0, seen, move, moves);
-        if (deltas[0] != deltas[1]) {
+        Move move;
+        if (deltas[0] == deltas[1]) {
+            for (int i = 0; i < 4; i++) {
+                move.clear();
+                find_moves(deltas, i, move, moves);
+                if (!moves.empty()) break;
+            }
+        } else {
+            move.clear();
+            find_moves(deltas, 0, move, moves);
             std::swap(deltas[0], deltas[1]);
-            seen.clear();
-            get_moves(deltas, 0, seen, move, moves);
+            move.clear();
+            find_moves(deltas, 0, move, moves);
+            if (moves.empty()) {
+                move.clear();
+                find_moves({std::max(deltas[0], deltas[1])}, 0, move, moves);
+                if (moves.empty()) {
+                    move.clear();
+                    find_moves({std::min(deltas[0], deltas[1])}, 0, move, moves);
+                }
+            }
         }
-        auto it = std::max_element(moves.begin(), moves.end(), [] (const Move& a, const Move& b) {
-            return a.size() < b.size();
-        });
-        if (it != moves.end()) {
-            auto mx = it->size();
-            moves.erase(std::remove_if(moves.begin(), moves.end(), [mx] (const Move& move) {
-                return move.size() != mx;
-            }), moves.end());
-            std::sort(moves.begin(), moves.end());
-            moves.erase(std::unique(moves.begin(), moves.end()), moves.end());
+        for (auto& m : moves) {
+            std::sort(m.begin(), m.end());
         }
+        std::sort(moves.begin(), moves.end());
+        moves.erase(std::unique(moves.begin(), moves.end()), moves.end());
         return moves;
     }
 
-    void State::get_moves(const Deltas& deltas, int index, std::set<Move>& seen, Move& move, Moves& moves) {
-        if (!move.empty() && seen.count(move)) {
-            return;
-        }
-        seen.insert(move);
+    void State::find_moves(const Deltas& deltas, int index, Move& move, Moves& moves) {
         if (index == (int)deltas.size()) {
-            if (!move.empty()) {
-                moves.push_back(move);
-            }
-            return;
-        }
-        if (can_bear_off() && no_moves(deltas, index)) {
-            Move to_be_erased;
-            for (auto point : home[turn]) {
-                while (on[turn][point] && index < (int)deltas.size()) {
-                    CheckerMove checker_move(point, OUT);
-                    move.insert(checker_move);
-                    to_be_erased.insert(checker_move);
-                    make_move({checker_move});
-                    index++;
-                }
-            }
-            if (!move.empty()) {
-                moves.push_back(move);
-            }
-            for (auto checker_move : to_be_erased) {
-                undo_move();
-                move.erase(move.find(checker_move));
-            }
-            return;
-        }
-        if (no_moves(deltas, index)) {
-            if (!move.empty()) {
-                moves.push_back(move);
-            }
+            moves.push_back(move);
             return;
         }
         int delta = deltas[index];
-        Move delta_move = get_move(delta);
-        if (delta_move.empty()) {
-            get_moves(deltas, index + 1, seen, move, moves);
+        if (on[turn][BAR]) {
+            int to = (turn == WHITE ? 24 : -1) + (turn == WHITE ? -1 : 1) * delta;
+            if (to >= 0 && to < BOARD_SIZE && on[!turn][to] <= 1) {
+                CheckerMove checker_move(BAR, to);
+                make_move({checker_move});
+                move.push_back(checker_move);
+                find_moves(deltas, index + 1, move, moves);
+                move.pop_back();
+                undo_move();
+            }
             return;
         }
-        for (auto checker_move : delta_move) {
-            make_move({checker_move});
-            move.insert(checker_move);
-            get_moves(deltas, index + 1, seen, move, moves);
-            move.erase(move.find(checker_move));
-            undo_move();
+        bool bear_off = can_bear_off();
+        for (int from = 0; from < BOARD_SIZE; from++) {
+            if (!on[turn][from]) continue;
+            int to = from + (turn == WHITE ? -1 : 1) * delta;
+            if (to >= 0 && to < BOARD_SIZE && on[!turn][to] <= 1) {
+                CheckerMove checker_move(from, to);
+                make_move({checker_move});
+                move.push_back(checker_move);
+                find_moves(deltas, index + 1, move, moves);
+                move.pop_back();
+                undo_move();
+            }
+            if (bear_off && can_bear_off(from, delta)) {
+                CheckerMove checker_move(from, OUT);
+                make_move({checker_move});
+                move.push_back(checker_move);
+                find_moves(deltas, index + 1, move, moves);
+                move.pop_back();
+                undo_move();
+            }
         }
+    }
+
+    bool State::can_bear_off() {
+        int cnt = 0;
+        for (auto point : home[turn]) {
+            cnt += on[turn][point];
+        }
+        return cnt + on[turn][OUT] == 15;
+    }
+
+    bool State::can_bear_off(int from, int delta) {
+        int direction = (turn == WHITE ? -1 : 1);
+        int bear_off_point = (turn == WHITE ? -1 : 24) - direction * delta;
+        if (from == bear_off_point) {
+            return true;
+        }
+        if ((turn == WHITE && from > bear_off_point) || (turn == BLACK && from < bear_off_point)) {
+            return false;
+        }
+        for (int point = (turn == WHITE ? 5 : 18); point != from; point += direction) {
+            if (on[turn][point]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     Outcome State::outcome(int player) const {
@@ -288,8 +295,8 @@ namespace Backgammon {
 
     void Game::play_turn() {
         dice.roll();
-        //state.show();
-        //std::cout << "Dice: " << dice.first << " " << dice.second << std::endl;
+        state.show();
+        std::cout << "Dice: " << dice.first << " " << dice.second << std::endl;
         Moves moves = state.get_moves(dice.get_deltas());
         if (moves.empty()) {
             players[state.turn]->no_moves(state);
@@ -297,10 +304,10 @@ namespace Backgammon {
             return;
         }
         int index = players[state.turn]->choose_move(state, dice, moves);
-        //std::cout << "Moved the following checkers (from, to):" << std::endl;
-        //for (auto [from, to] : moves[index]) {
-        //    std::cout << "(" << from + 1 << ", " << to + 1 << ")" << std::endl;
-        //}
+        std::cout << "Moved the following checkers (from, to):" << std::endl;
+        for (auto [from, to] : moves[index]) {
+            std::cout << "(" << from + 1 << ", " << to + 1 << ")" << std::endl;
+        }
         state.make_move(moves[index]);
         state.turn = !state.turn;
     }
@@ -320,7 +327,7 @@ namespace Backgammon {
             if (state.on[!state.turn][OUT] == 15) {
                 players[WHITE]->game_over(state, WHITE);
                 players[BLACK]->game_over(state, BLACK);
-                //state.show();
+                state.show();
                 Outcome outcome = state.outcome(WHITE);
                 std::string s;
                 if (outcome == Outcome::WON_SINGLE_GAME) {
@@ -342,7 +349,7 @@ namespace Backgammon {
                     s = " lost a backgammon";
                     points[BLACK] += 3;
                 }
-                //std::cout << "White " << s << std::endl;
+                std::cout << "White" << s << std::endl;
                 break;
             }
         }

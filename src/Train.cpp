@@ -8,24 +8,18 @@ using namespace Backgammon;
 int main() {
 
     int start = 0;
-    int end = 10'000'000;
+    int end = 4'000'000;
     int hidden_units = 80;
     std::vector<int> checkpoints = {
+        0,
         50'000,
         100'000,
         300'000,
         800'000,
         1'000'000,
-        1'500'000,
         2'000'000,
         3'000'000,
-        4'000'000,
-        5'000'000,
-        6'000'000,
-        7'000'000,
-        8'000'000,
-        9'000'000,
-        10'000'000,
+        4'000'000
     };
     int checkpoint = 0;
     int print_frequency = 1'000;
@@ -51,13 +45,18 @@ int main() {
 
     // Play games
     for (int i = start + 1; i <= end; i++) {
-        if (i % print_frequency == 0) {
-            std::cout << "Game nr. " << i << std::endl;
-        }
         game.play();
+        
+        if (i % print_frequency == 0 || (int)game.state.made.size() >= 200) {
+            std::cout << "Game nr. " << i << std::endl;
+            std::cout << "Nr. of moves made: " << (int)game.state.made.size() << std::endl;
+        }
 
-        if (i % checkpoints[checkpoint] == 0) {
+        while (checkpoint + 1 < (int)checkpoints.size() && checkpoints[checkpoint] < i) {
             checkpoint++;
+        }
+        
+        if (i % checkpoints[checkpoint] == 0) {
             std::string checkpoint = "weights/" + std::to_string(i) + "_games.csv";
             model->save(checkpoint);
             std::cout << "Saved weights in file: " << checkpoint << std::endl;

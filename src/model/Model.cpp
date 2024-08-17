@@ -1,18 +1,19 @@
 #include "Model.h"
 
+#define INPUT_FEATURES 201
+
 namespace Backgammon {
     NeuralNetwork::NeuralNetwork(int hidden_units) {
-        l1 = RevGrad::Linear(this, 200, hidden_units);
+        l1 = RevGrad::Linear(this, INPUT_FEATURES, hidden_units);
         l2 = RevGrad::Linear(this, hidden_units, 1);
     }
 
     RevGrad::Tensor NeuralNetwork::forward(RevGrad::Tensor x) {
-        RevGrad::Tensor y = x;
-        y = l1(y);
-        y = RevGrad::Tensor::relu(y);
-        y = l2(y);
-        y = RevGrad::Tensor::sigmoid(y);
-        return y;
+        x = l1(x);
+        x = RevGrad::Tensor::relu(x);
+        x = l2(x);
+        x = RevGrad::Tensor::sigmoid(x);
+        return x;
     }
 
     Model::Model(int hidden_units) : nn(NeuralNetwork(hidden_units)) {}
@@ -22,11 +23,9 @@ namespace Backgammon {
 
     RevGrad::Tensor Model::tensor_from_state(const State& state) {
         std::vector<float> values;
-        values.reserve(200);
+        values.reserve(INPUT_FEATURES);
         for (int player = 0; player <= 1; player++) {
-            int pip_cnt = 0;
             for (int point = 0; point < BOARD_SIZE; point++) {
-                pip_cnt += state.on[player][point] * abs(point - (player == WHITE ? -1 : 24));
                 int n = state.on[player][point];
                 if (n == 0) {
                     values.push_back(0.0f);
@@ -54,15 +53,13 @@ namespace Backgammon {
                 values.push_back(1.0f);
                 values.push_back((n - 3.0f) / 2.0f);
             }
-            values.push_back(pip_cnt / 540.0f);
+            values.push_back(state.compute_pip(player) / 375.0f);
         }
         for (int player = 0; player <= 1; player++) {
-            int n = state.on[player][BAR];
-            values.push_back(n / 2.0f);
+            values.push_back(state.on[player][BAR] / 2.0f);
         }
         for (int player = 0; player <= 1; player++) {
-            int n = state.on[player][OUT];
-            values.push_back(n / 15.0f);
+            values.push_back(state.on[player][OUT] / 15.0f);
         }
         if (state.turn == WHITE) {
             values.push_back(1.0f);
@@ -71,7 +68,9 @@ namespace Backgammon {
             values.push_back(0.0f);
             values.push_back(1.0f);
         }
-        return RevGrad::Tensor(RevGrad::Shape({200, 1}), values);
+        values.push_back(state.race());
+        assert((int)values.size() == INPUT_FEATURES);
+        return RevGrad::Tensor(RevGrad::Shape({INPUT_FEATURES, 1}), values);
     }
 
     int Model::choose_move(const State& state, const Dice& dice, const Moves& moves) {
@@ -104,12 +103,12 @@ namespace Backgammon {
     }
 
     void Model::update(const State& state, const Move& move) {
+        float alpha = 0.1f;
+        float error = 0.0f;
         State next = state;
         next.make_move(move);
         next.turn = !next.turn;
-        RevGrad::Tensor next_prediction = predict(next);
         RevGrad::Tensor prediction = predict(state);
-        float error;
         if (next.on[WHITE][OUT] == 15 || next.on[BLACK][OUT] == 15) {
             Outcome outcome = next.outcome(WHITE);
             if (
@@ -122,9 +121,8 @@ namespace Backgammon {
                 error = 0 - prediction.values()[0];
             }
         } else {
-            error = next_prediction.values()[0] - prediction.values()[0];
+            error = predict(next).values()[0] - prediction.values()[0];
         }
-        float alpha = 0.1f;
         // Zero the gradients
         for (auto param : nn.get_params()) {
             for (auto& grad : param.grads()) {

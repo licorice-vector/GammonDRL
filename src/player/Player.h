@@ -8,7 +8,7 @@ namespace Backgammon {
     class State;
     class Dice;
 
-    typedef std::multiset<CheckerMove> Move;
+    typedef std::vector<CheckerMove> Move;
     typedef std::vector<Move> Moves;
 
     class Player {

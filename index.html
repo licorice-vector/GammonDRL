@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <title>Backgammon</title>
+    <style>
+        body {
+            margin: 50;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #top-container {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            justify-content: center;
+            flex-direction: column;
+            margin-top: 20px;
+        }
+
+        #controls {
+            display: flex;
+            align-items: center;
+        }
+
+        #controls p {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="top-container">
+        <p id="explanation">
+            Click on the point you want to move from, then on the point you want to move to.
+            <br>
+            <br>
+            Your action will be added to the current move at the bottom of the screen.
+            <br>
+            <br>
+            Remember to click on the 'Roll Dice' button at the start of every turn.
+        </p>
+        <div id="controls">
+            <p>Select a model file:</p>
+            <input id="csv" type="file" accept=".csv">
+        </div>
+    </div>
+    <div id="canvas-container"></div>
+    <script src="backgammon.js"></script>
+</body>
+</html>

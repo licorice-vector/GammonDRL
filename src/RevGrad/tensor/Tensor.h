@@ -142,6 +142,7 @@ namespace RevGrad {
         void transpose();
         Tensor slice(const std::vector<std::pair<int, int>>& ranges) const;
         void backward();
+        void backward(const std::vector<float>& prior);
     };
 }
 

@@ -2,6 +2,7 @@
 #define MODEL_H
 
 #include "../RevGrad/model/Model.h"
+#include "../RevGrad/utill/Print.h"
 #include "../player/Player.h"
 
 namespace Backgammon {

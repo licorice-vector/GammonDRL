@@ -35,7 +35,7 @@ namespace Backgammon {
     class Dice;
     class Game;
 
-    typedef std::multiset<CheckerMove> Move;
+    typedef std::vector<CheckerMove> Move;
     typedef std::vector<Move> Moves;
     typedef std::vector<int> Deltas;
     typedef std::vector<std::pair<int, CheckerMove>> Undo;
@@ -57,20 +57,17 @@ namespace Backgammon {
             std::array<int, 6>{5, 4, 3, 2, 1, 0},
             std::array<int, 6>{18, 19, 20, 21, 22, 23}
         };
-        std::array<std::pair<int, int>, 2> home_range = {
-            std::make_pair(0, 5),
-            std::make_pair(18, 23)
-        };
         std::array<std::array<int, 26>, 2> on;
         std::stack<Undo> made;
         State();
-        bool can_bear_off();
+        int compute_pip(int player) const;
+        bool race() const;
         void make_move(Move move);
         void undo_move();
-        Move get_move(int delta);
-        bool no_moves(const Deltas& deltas, int index);
         Moves get_moves(Deltas deltas);
-        void get_moves(const Deltas& deltas, int index, std::set<Move>& seen, Move& move, Moves& moves);
+        void find_moves(const Deltas& deltas, int index, Move& move, Moves& moves);
+        bool can_bear_off();
+        bool can_bear_off(int from, int delta);
         Outcome outcome(int player) const;
         void show() const;
     };
